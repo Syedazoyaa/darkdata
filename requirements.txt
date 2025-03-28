@@ -2,6 +2,8 @@ streamlit==1.42.2
 pandas==2.2.3
 numpy==1.26.4
 paddleocr==2.9.1
+
+paddlepaddle==2.6.0
 hugchat==0.4.18
 pydantic==2.10.6
 psycopg2-binary==2.9.10
