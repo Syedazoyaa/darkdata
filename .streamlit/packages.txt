@@ -4,4 +4,5 @@ libglib2.0-0
 libsm6
 libxext6
 libxrender1
-libglvnd0
+mesa-utils
+libglu1-mesa-dev
