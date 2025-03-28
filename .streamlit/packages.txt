@@ -1,7 +1,7 @@
+libgl1
 libgl1-mesa-glx
 libglib2.0-0
-build-essential
-python3-dev
 libsm6
 libxext6
-libxrender-dev
+libxrender1
+libglvnd0
