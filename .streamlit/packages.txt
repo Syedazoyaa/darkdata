@@ -2,4 +2,6 @@ libgl1-mesa-glx
 libglib2.0-0
 build-essential
 python3-dev
-libssl-dev  # For psycopg2
+libsm6
+libxext6
+libxrender-dev
