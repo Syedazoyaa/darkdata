@@ -9,7 +9,7 @@ paddlepaddle==2.5.2 -f https://www.paddlepaddle.org.cn/whl/linux/cpu-mkl/stable.
 paddleocr==2.9.1
 opencv-python-headless==4.9.0.80
 shapely==2.0.3
-
+pytesseract==0.3.10  # OCR alternative if PaddleOCR fails
 # Additional packages
 hugchat==0.4.18
 pydantic==2.10.6
