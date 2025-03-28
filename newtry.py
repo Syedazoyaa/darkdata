@@ -17,6 +17,7 @@ import ast
 import base64
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 # Configure logging
 logging.basicConfig(
@@ -262,10 +263,8 @@ def display_results(results):
             st.error(f"Database save failed: {e}")
 
 # Main App Functions
-plt.style.use('fivethirtyeight')  # Ensure 538 style is applied to all visualizations
-
 def app_dashboard():
-    """Dashboard page showing key statistics"""
+    """Dashboard page showing key statistics with clean, aesthetic visualizations"""
     st.title("📊 Dashboard")
     st.write("Overview of data in the database.")
 
@@ -274,7 +273,7 @@ def app_dashboard():
         total_count = conn.execute("SELECT COUNT(*) as count FROM files").fetchone()[0]
         
         if total_count > 0:
-            st.metric("Total Files", total_count)
+            st.metric("Total Files Processed", total_count)
             
             # Vendor analysis
             vendors = conn.execute("""
@@ -285,9 +284,8 @@ def app_dashboard():
             
             if vendors:
                 vendor_list = [v[0] for v in vendors if v[0]]
-                st.subheader("Vendors")
-                st.write(f"Total unique vendors: {len(vendor_list)}")
-                st.write(", ".join(vendor_list[:10]) + ("..." if len(vendor_list) > 10 else ""))
+                st.subheader("Vendor Summary")
+                st.caption(f"{len(vendor_list)} unique vendors")
                 
                 vendor_counts = conn.execute("""
                     SELECT json_extract(data, '$.vendor_name') as vendor, COUNT(*) as count
@@ -295,15 +293,50 @@ def app_dashboard():
                     WHERE json_extract(data, '$.vendor_name') IS NOT NULL
                     GROUP BY vendor
                     ORDER BY count DESC
+                    LIMIT 8
                 """).fetchall()
                 
                 if vendor_counts:
-                    vendor_df = pd.DataFrame(vendor_counts, columns=["vendor", "count"])
-                    st.bar_chart(vendor_df.set_index("vendor"))
+                    vendor_df = pd.DataFrame(vendor_counts, columns=["Vendor", "Documents"])
+                    
+                    # Apply 538 style with pastel palette
+                    plt.style.use('fivethirtyeight')
+                    fig, ax = plt.subplots(figsize=(10, 5))
+                    
+                    # Pastel color palette
+                    pastel_colors = [
+                        '#8dd3c7', '#ffffb3', '#bebada', '#fb8072',
+                        '#80b1d3', '#fdb462', '#b3de69', '#fccde5'
+                    ]
+                    
+                    # Create vertical bar plot
+                    bars = ax.bar(vendor_df["Vendor"], vendor_df["Documents"],
+                                 color=pastel_colors[:len(vendor_df)],
+                                 edgecolor='white', linewidth=0.7)
+                    
+                    # Customize plot
+                    ax.set_title('Top Vendors', fontsize=16, pad=20, weight='bold')
+                    ax.set_ylabel('Number of Documents', fontsize=12)
+                    ax.tick_params(axis='x', rotation=45, labelsize=10)
+                    ax.tick_params(axis='y', labelsize=10)
+                    
+                    # Remove unnecessary chart junk
+                    ax.spines['top'].set_visible(False)
+                    ax.spines['right'].set_visible(False)
+                    ax.grid(axis='y', alpha=0.3)
+                    
+                    # Add value labels on top of bars if space permits
+                    for bar in bars:
+                        height = bar.get_height()
+                        ax.text(bar.get_x() + bar.get_width()/2., height,
+                                f'{int(height)}',
+                                ha='center', va='bottom', fontsize=10)
+                    
+                    st.pyplot(fig)
 
-            # Recent files line chart
+            # Amount trend visualization
             st.markdown("---")
-            st.subheader("Total Amount Trend Over Time")
+            st.subheader("Invoice Amount Trend")
             
             recent_files = conn.execute("""
                 SELECT 
@@ -316,23 +349,53 @@ def app_dashboard():
             """).fetchall()
             
             if recent_files:
-                trend_df = pd.DataFrame(recent_files, columns=["date", "total_amount"])
-                trend_df['date'] = pd.to_datetime(trend_df['date'], errors='coerce')
-                trend_df['total_amount'] = pd.to_numeric(trend_df['total_amount'], errors='coerce')
-                trend_df = trend_df.dropna().sort_values(by="date")
+                trend_df = pd.DataFrame(recent_files, columns=["Date", "Amount"])
+                trend_df['Date'] = pd.to_datetime(trend_df['Date'], errors='coerce')
+                trend_df['Amount'] = pd.to_numeric(trend_df['Amount'], errors='coerce')
+                trend_df = trend_df.dropna().sort_values(by="Date")
                 
-                fig, ax = plt.subplots(figsize=(10, 6))
-                ax.plot(trend_df['date'], trend_df['total_amount'], marker='o', color='blue', linewidth=2)
-                ax.set_title("Total Amount Trend Over Time", fontsize=16)
-                ax.set_xlabel("Date", fontsize=12)
-                ax.set_ylabel("Total Amount", fontsize=12)
-                ax.grid(True)
+                # Apply 538 style
+                plt.style.use('fivethirtyeight')
+                fig, ax = plt.subplots(figsize=(12, 5))
+                
+                # Create line plot with subtle styling
+                ax.plot(trend_df['Date'], trend_df['Amount'],
+                       linewidth=2.5, color='#30a2da', alpha=0.9,
+                       marker='o', markersize=5, markeredgecolor='white',
+                       markerfacecolor='#30a2da')
+                
+                # Customize plot
+                ax.set_title('Invoice Amounts Over Time', fontsize=16, pad=20, weight='bold')
+                ax.set_ylabel('Amount ($)', fontsize=12)
+                ax.tick_params(axis='both', which='major', labelsize=10)
+                
+                # Format x-axis dates cleanly
+                ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
+                ax.xaxis.set_major_locator(mdates.MonthLocator(interval=max(1, len(trend_df)//6)))
+                plt.xticks(rotation=45, fontsize=8)  # Smaller font size for x-axis labels
+                ax.set_xlabel("Date (Months)", fontsize=10)  # Add proper units to x-axis label
+                
+                # Clean up the plot
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
+                ax.grid(axis='y', alpha=0.3)
+                
                 st.pyplot(fig)
+                
+                # Show clean metrics in columns
+                st.markdown("### Summary Statistics")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Highest Invoice", f"${trend_df['Amount'].max():,.0f}")
+                with col2:
+                    st.metric("Average Invoice", f"${trend_df['Amount'].mean():,.0f}")
+                with col3:
+                    st.metric("Total Volume", f"${trend_df['Amount'].sum():,.0f}")
             else:
-                st.info("No recent files with valid dates and amounts to display.")
+                st.info("No invoice data available for trend analysis")
     except Exception as e:
         st.error(f"Error loading dashboard data: {e}")
-
+        
 def app_upload_files():
     """File upload and processing with guaranteed completion"""
     st.title("📄 Upload Files")
